@@ -1,5 +1,7 @@
 # gpmf-sync-web
 
+![GPMF Sync Web preview](https://raw.githubusercontent.com/albertowd/gpmf-sync-web/main/public/preview.webp)
+
 Browser-side GoPro MP4 timestamp extractor — a TypeScript port of
 [`albertowd/gpmf-sync`](https://github.com/albertowd/gpmf-sync) that
 runs entirely in the browser. Files never leave your machine.
@@ -35,7 +37,7 @@ byte ranges hit memory.
 ## Develop
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -45,12 +47,12 @@ Open the URL Vite prints (typically `http://localhost:5173`).
 
 | Command | What it does |
 | --- | --- |
+| `npm run build` | typecheck + production bundle (`dist/`) |
+| `npm run ci` | `lint && typecheck && build` (matches CI) |
 | `npm run lint` | Biome — formatting + lint |
 | `npm run format` | Biome — write formatting fixes |
-| `npm run typecheck` | TypeScript project-references typecheck |
-| `npm run build` | typecheck + production bundle (`dist/`) |
 | `npm run preview` | Serve the built bundle locally |
-| `npm run ci` | `lint && typecheck && build` (matches CI) |
+| `npm run typecheck` | TypeScript project-references typecheck |
 
 ## Layout
 
