@@ -10,11 +10,21 @@ is handled without uploading or buffering it.
 
 ## Status
 
-Pass 1 (current): `mvhd` and `mdhd` timestamp paths, plus camera info
-(`FIRM`, `CAME`, `LENS`).
+Feature parity with the parent CLI's `sync` command:
 
-Pass 2 (planned): GPMF GPSU/GPSF and `udta/GPMF/CDAT` timestamps; TCX +
-RaceChrono v3 CSV alignment.
+- MP4 timestamp sources: `gps` (first GPMF GPSU with fix), `mvhd`,
+  `mdhd`, `cdat` (udta/GPMF). When GoPro's local-time-as-UTC firmware
+  quirk makes sources disagree, the alternatives are surfaced so you
+  can pick the matching timezone.
+- TCX (Garmin) and RaceChrono v3 CSV first-timestamp readers.
+- Cross-format alignment: chooses a reference (first MP4 with a
+  timestamp), then computes a signed delta and trim/offset/aligned
+  action per file.
+
+Files never leave the browser — TCX/CSV are streamed line-by-line with
+`ReadableStream` + `TextDecoderStream` and short-circuited on the first
+match; MP4 reads use `Blob.slice().arrayBuffer()` so only the requested
+byte ranges hit memory.
 
 ## Develop
 
@@ -42,8 +52,16 @@ Open the URL Vite prints (typically `http://localhost:5173`).
   browser `File`/`Blob`. Reads byte ranges via `Blob.slice().arrayBuffer()`,
   so only the requested bytes hit memory.
 - `src/lib/mp4/atoms.ts` — streaming atom walker (port of `mp4/atoms.py`).
-- `src/lib/mp4/meta.ts` — `mvhd` / `mdhd` / `hdlr` / `trak` parsing.
-- `src/lib/mp4/timestamps.ts` — high-level timestamp extraction.
+- `src/lib/mp4/meta.ts` — `mvhd` / `mdhd` / `hdlr` / `stsd` / sample-table
+  (`stco`/`co64`/`stsz`/`stsc`) parsing.
+- `src/lib/mp4/gpmf.ts` — GPMF KLV parser (port of `mp4/gpmf.py`).
+- `src/lib/mp4/gpmfTrack.ts` — resolves GPMF samples to file offsets
+  using the sample-table atoms.
+- `src/lib/mp4/timestamps.ts` — high-level timestamp extraction
+  (gps / mvhd / mdhd / cdat) and `udta` camera info.
+- `src/lib/external/tcx.ts`, `rcCsv.ts`, `lineStream.ts` — TCX +
+  RaceChrono CSV first-timestamp readers, streamed line-by-line.
+- `src/lib/sync.ts` — cross-format `SyncReport` builder.
 - `src/components/` — React UI mirroring the tkinter layout from
   `gpmf-sync/src/gmpf_sync/gui.py`.
 
