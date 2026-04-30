@@ -130,7 +130,7 @@ export default function App() {
   const onClear = useCallback(() => setSlots([]), []);
 
   const onLoadExamples = useCallback(async () => {
-    const names = ["example.mp4", "example.tcx", "example.csv"] as const;
+    const names = ["example.mp4", "example.tcx", "example.csv", "unknown.zip"] as const;
     const blobs = await Promise.all(
       names.map((n) => fetch(`./examples/${n}`).then((r) => r.blob())),
     );

@@ -64,7 +64,7 @@ async function extractMvhd(f: RandomAccessFile, moov: Atom): Promise<StampSource
 
 function extractMdhd(tracks: readonly TrackInfo[]): StampSource {
   const vide = tracks.find((t) => t.handlerType === "vide" && t.mdhd !== null);
-  if (!vide || !vide.mdhd) return missingSource("mdhd", "no video track with mdhd");
+  if (!vide?.mdhd) return missingSource("mdhd", "no video track with mdhd");
   return {
     name: "mdhd",
     epoch: vide.mdhd.creationUnix,

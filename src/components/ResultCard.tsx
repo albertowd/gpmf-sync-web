@@ -51,7 +51,12 @@ function badgeClass(kind: FileKind): string {
 function KindBadge({ kind }: { kind: FileKind }) {
   const Icon = KIND_ICON[kind];
   return (
-    <span className={badgeClass(kind)} aria-label={KIND_LABEL[kind]} title={KIND_LABEL[kind]}>
+    <span
+      className={badgeClass(kind)}
+      role="img"
+      aria-label={KIND_LABEL[kind]}
+      title={KIND_LABEL[kind]}
+    >
       <Icon size={14} strokeWidth={2} aria-hidden />
     </span>
   );
@@ -68,7 +73,11 @@ export function ResultCard({ state }: Props) {
     return (
       <div className={styles.card}>
         <div className={styles.header}>
-          <span className={`${styles.badge} ${styles.pending}`} aria-label="Reading file">
+          <span
+            className={`${styles.badge} ${styles.pending}`}
+            role="img"
+            aria-label="Reading file"
+          >
             <Loader2 size={14} strokeWidth={2} className={styles.spin} aria-hidden />
           </span>
           <span className={styles.filename} title={file.name}>

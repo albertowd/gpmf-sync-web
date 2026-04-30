@@ -17,7 +17,7 @@ export function DropZone({ onFiles, empty, placeholder, children }: Props) {
 
   const open = useCallback(() => inputRef.current?.click(), []);
 
-  const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+  const onDragOver = useCallback((e: DragEvent<HTMLElement>) => {
     e.preventDefault();
     setHover(true);
   }, []);
@@ -25,7 +25,7 @@ export function DropZone({ onFiles, empty, placeholder, children }: Props) {
   const onDragLeave = useCallback(() => setHover(false), []);
 
   const onDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    (e: DragEvent<HTMLElement>) => {
       e.preventDefault();
       setHover(false);
       const files = Array.from(e.dataTransfer.files);
@@ -35,8 +35,9 @@ export function DropZone({ onFiles, empty, placeholder, children }: Props) {
   );
 
   return (
-    <div
+    <section
       className={`${styles.dropZone} ${hover ? styles.hover : ""}`}
+      aria-label="File drop area"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -70,6 +71,6 @@ export function DropZone({ onFiles, empty, placeholder, children }: Props) {
           e.target.value = "";
         }}
       />
-    </div>
+    </section>
   );
 }

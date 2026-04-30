@@ -8,7 +8,7 @@
 
 import { rcCsvFirstTimestamp } from "./external/rcCsv.ts";
 import { tcxFirstTimestamp } from "./external/tcx.ts";
-import { DEFAULT_AUTO_ORDER, type TimestampReport, extractTimestamps } from "./mp4/timestamps.ts";
+import { DEFAULT_AUTO_ORDER, extractTimestamps, type TimestampReport } from "./mp4/timestamps.ts";
 import { RandomAccessFile } from "./randomAccessFile.ts";
 
 export type FileKind = "mp4" | "tcx" | "csv" | "unknown";
