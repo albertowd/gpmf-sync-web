@@ -1,0 +1,89 @@
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--badge-mp4);
+  color: var(--fg);
+}
+
+.badgeError {
+  background: var(--badge-unknown);
+}
+
+.filename {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesize {
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timestamp {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.sourceTag {
+  color: var(--info);
+  margin-left: 8px;
+}
+
+.warn {
+  color: var(--warn);
+  font-size: 12px;
+}
+
+.alt {
+  color: var(--fg-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.camera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-family: var(--mono);
+}
+
+.cameraKey {
+  color: var(--fg);
+}
+
+.error {
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.spinner {
+  color: var(--fg-dim);
+  font-style: italic;
+  font-size: 13px;
+}

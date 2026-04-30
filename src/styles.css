@@ -1,0 +1,68 @@
+/* Palette mirrors the tkinter GUI in src/gmpf_sync/gui.py. */
+:root {
+  --bg: #1e1e1e;
+  --fg: #e8e8e8;
+  --fg-dim: #9a9a9a;
+
+  --card-bg: #2a2a2a;
+  --card-border: #3a3a3a;
+  --card-bg-ref: #1f3340;
+  --card-border-ref: #5a8dee;
+
+  --drop-bg: #2d2d2d;
+  --drop-hover-bg: #3a3a3a;
+  --drop-border: #5a8dee;
+
+  --console-bg: #141414;
+
+  --ok: #5fcf80;
+  --warn: #ffb454;
+  --info: #7eb6ff;
+
+  --badge-mp4: #3a5a3a;
+  --badge-tcx: #5a3a5a;
+  --badge-csv: #3a4d6a;
+  --badge-unknown: #444444;
+
+  --mono: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  --sans: -apple-system, "Segoe UI", system-ui, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  background: #333;
+  color: var(--fg);
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #3a3a3a;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
