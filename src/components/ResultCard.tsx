@@ -1,3 +1,11 @@
+import {
+  FileQuestion,
+  FileSpreadsheet,
+  Loader2,
+  type LucideIcon,
+  Route,
+  Video,
+} from "lucide-react";
 import { describeAction } from "../lib/format.ts";
 import type { Candidate, FileKind, SyncEntry } from "../lib/sync.ts";
 import styles from "./ResultCard.module.css";
@@ -19,6 +27,20 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+const KIND_ICON: Record<FileKind, LucideIcon> = {
+  mp4: Video,
+  tcx: Route,
+  csv: FileSpreadsheet,
+  unknown: FileQuestion,
+};
+
+const KIND_LABEL: Record<FileKind, string> = {
+  mp4: "GoPro MP4",
+  tcx: "TCX activity",
+  csv: "RaceChrono CSV",
+  unknown: "Unknown file",
+};
+
 function badgeClass(kind: FileKind): string {
   if (kind === "tcx") return `${styles.badge} ${styles.tcx}`;
   if (kind === "csv") return `${styles.badge} ${styles.csv}`;
@@ -26,9 +48,13 @@ function badgeClass(kind: FileKind): string {
   return styles.badge;
 }
 
-function badgeLabel(kind: FileKind): string {
-  if (kind === "unknown") return "?";
-  return kind.toUpperCase();
+function KindBadge({ kind }: { kind: FileKind }) {
+  const Icon = KIND_ICON[kind];
+  return (
+    <span className={badgeClass(kind)} aria-label={KIND_LABEL[kind]} title={KIND_LABEL[kind]}>
+      <Icon size={14} strokeWidth={2} aria-hidden />
+    </span>
+  );
 }
 
 interface Props {
@@ -42,7 +68,9 @@ export function ResultCard({ state }: Props) {
     return (
       <div className={styles.card}>
         <div className={styles.header}>
-          <span className={styles.badge}>···</span>
+          <span className={`${styles.badge} ${styles.pending}`} aria-label="Reading file">
+            <Loader2 size={14} strokeWidth={2} className={styles.spin} aria-hidden />
+          </span>
           <span className={styles.filename} title={file.name}>
             {file.name}
           </span>
@@ -61,7 +89,7 @@ export function ResultCard({ state }: Props) {
     return (
       <div className={cardClass}>
         <div className={styles.header}>
-          <span className={badgeClass(entry.kind)}>{badgeLabel(entry.kind)}</span>
+          <KindBadge kind={entry.kind} />
           <span className={styles.filename} title={file.name}>
             {file.name}
           </span>
@@ -79,7 +107,7 @@ export function ResultCard({ state }: Props) {
   return (
     <div className={cardClass}>
       <div className={styles.header}>
-        <span className={badgeClass(entry.kind)}>{badgeLabel(entry.kind)}</span>
+        <KindBadge kind={entry.kind} />
         <span className={styles.filename} title={file.name}>
           {file.name}
         </span>

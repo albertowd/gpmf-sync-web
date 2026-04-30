@@ -129,7 +129,30 @@ export default function App() {
 
   const onClear = useCallback(() => setSlots([]), []);
 
+  const onLoadExamples = useCallback(async () => {
+    const names = ["example.mp4", "example.tcx", "example.csv"] as const;
+    const blobs = await Promise.all(
+      names.map((n) => fetch(`./examples/${n}`).then((r) => r.blob())),
+    );
+    const files = names.map((name, i) => {
+      const blob = blobs[i];
+      if (!blob) throw new Error(`failed to load ${name}`);
+      return new File([blob], name, { lastModified: Date.now() });
+    });
+    onFiles(files);
+  }, [onFiles]);
+
   const rawText = useMemo(() => buildRawText(slots, report), [slots, report]);
+
+  const orderedSlots = useMemo<Slot[]>(() => {
+    const refFile = report.referenceFile;
+    if (refFile === null) return slots;
+    const idx = slots.findIndex((s) => s.stamp?.file === refFile);
+    if (idx <= 0) return slots;
+    const ref = slots[idx];
+    if (!ref) return slots;
+    return [ref, ...slots.slice(0, idx), ...slots.slice(idx + 1)];
+  }, [slots, report.referenceFile]);
 
   return (
     <div className={styles.app}>
@@ -142,6 +165,14 @@ export default function App() {
 
       <div className={styles.statusBar}>
         <span className={styles.status}>{status}</span>
+        <button
+          type="button"
+          onClick={onLoadExamples}
+          disabled={slots.length > 0}
+          title="Load bundled example files"
+        >
+          Try examples
+        </button>
         <button type="button" onClick={onClear} disabled={slots.length === 0}>
           Clear
         </button>
@@ -149,7 +180,7 @@ export default function App() {
 
       <div className={styles.cardsArea}>
         <Zone onFiles={onFiles} empty={slots.length === 0} placeholder={PLACEHOLDER}>
-          {slots.map((slot) => {
+          {orderedSlots.map((slot) => {
             const cardState: CardState = makeCardState(slot, report);
             return <ResultCard key={slot.key} state={cardState} />;
           })}

@@ -20,11 +20,13 @@
 }
 
 .badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 2px 8px;
-  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
   background: var(--badge-mp4);
   color: var(--fg);
 }
@@ -39,6 +41,21 @@
 
 .badge.unknown {
   background: var(--badge-unknown);
+}
+
+.badge.pending {
+  background: var(--badge-unknown);
+  color: var(--fg-dim);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .refTag {
