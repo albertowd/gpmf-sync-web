@@ -1,16 +1,40 @@
-import { useCallback, useMemo, useState } from "react";
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./App.module.css";
-import { DropZone } from "./components/DropZone.tsx";
+import { MobileDropZone } from "./components/MobileDropZone.tsx";
 import { type CardState, ResultCard } from "./components/ResultCard.tsx";
-import {
-  type FileTimestamp,
-  type SyncReport,
-  buildSyncReport,
-  describeAction,
-  readFirstTimestamp,
-} from "./lib/sync.ts";
+import { describeAction } from "./lib/format.ts";
+import type { FileTimestamp, SyncReport } from "./lib/sync.ts";
 
-const PLACEHOLDER = "Drop GoPro MP4 / TCX / CSV files here  —  or click to browse.";
+type ParserModule = typeof import("./lib/sync.ts");
+type DropZoneModule = typeof import("./components/DropZone.tsx");
+type DropZoneProps = Parameters<typeof MobileDropZone>[0];
+type DropZoneComponent = ComponentType<DropZoneProps>;
+
+let parserPromise: Promise<ParserModule> | null = null;
+function loadParser(): Promise<ParserModule> {
+  if (!parserPromise) parserPromise = import("./lib/sync.ts");
+  return parserPromise;
+}
+
+// Touch devices can't drag-and-drop between windows, so the desktop
+// DropZone (with drag handlers + hover state) is loaded as a separate
+// chunk and skipped entirely on mobile.
+const IS_TOUCH_ONLY =
+  typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+const DESKTOP_PLACEHOLDER = "Drop GoPro MP4 / TCX / CSV files here  —  or click to browse.";
+const MOBILE_PLACEHOLDER = "Tap to browse GoPro MP4 / TCX / CSV files.";
+const PLACEHOLDER = IS_TOUCH_ONLY ? MOBILE_PLACEHOLDER : DESKTOP_PLACEHOLDER;
+const EMPTY_STATUS = IS_TOUCH_ONLY ? "Tap below to add files." : "Drop files to begin.";
+
+const EMPTY_REPORT: SyncReport = {
+  referenceFile: null,
+  referencePrimarySource: null,
+  referenceEpoch: null,
+  referenceIso: null,
+  referenceAlternatives: [],
+  entries: [],
+};
 
 interface Slot {
   file: File;
@@ -33,6 +57,21 @@ function truncatePath(s: string, max = 60): string {
 export default function App() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [showRaw, setShowRaw] = useState(false);
+  const [parser, setParser] = useState<ParserModule | null>(null);
+  const [DesktopDropZone, setDesktopDropZone] = useState<DropZoneComponent | null>(null);
+
+  useEffect(() => {
+    if (IS_TOUCH_ONLY) return;
+    let cancelled = false;
+    void import("./components/DropZone.tsx").then((mod: DropZoneModule) => {
+      if (!cancelled) setDesktopDropZone(() => mod.DropZone);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const Zone: DropZoneComponent = DesktopDropZone ?? MobileDropZone;
 
   const finishedStamps = useMemo<FileTimestamp[]>(
     () =>
@@ -42,10 +81,13 @@ export default function App() {
     [slots],
   );
 
-  const report = useMemo<SyncReport>(() => buildSyncReport(finishedStamps), [finishedStamps]);
+  const report = useMemo<SyncReport>(
+    () => (parser ? parser.buildSyncReport(finishedStamps) : EMPTY_REPORT),
+    [parser, finishedStamps],
+  );
 
   const status = useMemo(() => {
-    if (slots.length === 0) return "Drop files to begin.";
+    if (slots.length === 0) return EMPTY_STATUS;
     const pending = slots.filter((s) => s.stamp === null).length;
     if (pending > 0) return `Reading ${slots.length} file(s) — ${pending} pending`;
     if (report.referenceFile === null) {
@@ -62,20 +104,24 @@ export default function App() {
         .map<Slot>((file) => ({ file, key: fileKey(file), stamp: null }));
       if (fresh.length === 0) return prev;
 
-      for (const slot of fresh) {
-        void (async () => {
-          const stamp = await readFirstTimestamp(slot.file).catch<FileTimestamp>((err) => ({
-            file: slot.file.name,
-            kind: "unknown",
-            epoch: null,
-            iso: null,
-            primarySource: null,
-            candidates: [],
-            detail: { error: err instanceof Error ? err.message : String(err) },
-          }));
-          setSlots((cur) => cur.map((s) => (s.key === slot.key ? { ...s, stamp } : s)));
-        })();
-      }
+      void (async () => {
+        const mod = await loadParser();
+        setParser((cur) => cur ?? mod);
+        for (const slot of fresh) {
+          void (async () => {
+            const stamp = await mod.readFirstTimestamp(slot.file).catch<FileTimestamp>((err) => ({
+              file: slot.file.name,
+              kind: "unknown",
+              epoch: null,
+              iso: null,
+              primarySource: null,
+              candidates: [],
+              detail: { error: err instanceof Error ? err.message : String(err) },
+            }));
+            setSlots((cur) => cur.map((s) => (s.key === slot.key ? { ...s, stamp } : s)));
+          })();
+        }
+      })();
 
       return [...prev, ...fresh];
     });
@@ -102,12 +148,12 @@ export default function App() {
       </div>
 
       <div className={styles.cardsArea}>
-        <DropZone onFiles={onFiles} empty={slots.length === 0} placeholder={PLACEHOLDER}>
+        <Zone onFiles={onFiles} empty={slots.length === 0} placeholder={PLACEHOLDER}>
           {slots.map((slot) => {
             const cardState: CardState = makeCardState(slot, report);
             return <ResultCard key={slot.key} state={cardState} />;
           })}
-        </DropZone>
+        </Zone>
       </div>
 
       <div className={styles.consoleSep} />

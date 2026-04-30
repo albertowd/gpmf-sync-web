@@ -1,5 +1,5 @@
+import { describeAction } from "../lib/format.ts";
 import type { Candidate, FileKind, SyncEntry } from "../lib/sync.ts";
-import { describeAction } from "../lib/sync.ts";
 import styles from "./ResultCard.module.css";
 
 export type CardState =
