@@ -8,7 +8,8 @@ interface Props {
   children: ReactNode;
 }
 
-const ACCEPT = ".mp4,.mov,video/mp4,video/quicktime";
+const ACCEPT =
+  ".mp4,.mov,.tcx,.csv,video/mp4,video/quicktime,application/vnd.garmin.tcx+xml,text/csv";
 
 export function DropZone({ onFiles, empty, placeholder, children }: Props) {
   const [hover, setHover] = useState(false);

@@ -8,6 +8,11 @@
   gap: 8px;
 }
 
+.card.reference {
+  background: var(--card-bg-ref);
+  border-color: var(--card-border-ref);
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -24,8 +29,24 @@
   color: var(--fg);
 }
 
-.badgeError {
+.badge.tcx {
+  background: var(--badge-tcx);
+}
+
+.badge.csv {
+  background: var(--badge-csv);
+}
+
+.badge.unknown {
   background: var(--badge-unknown);
+}
+
+.refTag {
+  margin-left: auto;
+  color: var(--info);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .filename {
@@ -35,6 +56,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .filesize {
@@ -53,15 +75,43 @@
   margin-left: 8px;
 }
 
+.action {
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.action.aligned {
+  color: var(--ok);
+}
+
+.action.offset,
+.action.trim {
+  color: var(--info);
+}
+
 .warn {
   color: var(--warn);
   font-size: 12px;
 }
 
-.alt {
+.altRow {
+  color: var(--warn);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.altIndent {
   color: var(--fg-dim);
   font-family: var(--mono);
   font-size: 12px;
+  padding-left: 18px;
+}
+
+.disagreementHint {
+  color: var(--warn);
+  font-size: 11px;
+  font-style: italic;
 }
 
 .camera {

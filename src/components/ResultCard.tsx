@@ -1,16 +1,34 @@
-import type { TimestampReport } from "../lib/mp4/timestamps.ts";
+import type { Candidate, FileKind, SyncEntry } from "../lib/sync.ts";
+import { describeAction } from "../lib/sync.ts";
 import styles from "./ResultCard.module.css";
 
 export type CardState =
   | { kind: "pending"; file: File }
-  | { kind: "ok"; file: File; report: TimestampReport }
-  | { kind: "error"; file: File; message: string };
+  | {
+      kind: "ready";
+      file: File;
+      entry: SyncEntry;
+      isReference: boolean;
+      referenceAlternatives: readonly Candidate[];
+    };
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function badgeClass(kind: FileKind): string {
+  if (kind === "tcx") return `${styles.badge} ${styles.tcx}`;
+  if (kind === "csv") return `${styles.badge} ${styles.csv}`;
+  if (kind === "unknown") return `${styles.badge} ${styles.unknown}`;
+  return styles.badge;
+}
+
+function badgeLabel(kind: FileKind): string {
+  if (kind === "unknown") return "?";
+  return kind.toUpperCase();
 }
 
 interface Props {
@@ -24,7 +42,7 @@ export function ResultCard({ state }: Props) {
     return (
       <div className={styles.card}>
         <div className={styles.header}>
-          <span className={styles.badge}>MP4</span>
+          <span className={styles.badge}>···</span>
           <span className={styles.filename} title={file.name}>
             {file.name}
           </span>
@@ -35,60 +53,74 @@ export function ResultCard({ state }: Props) {
     );
   }
 
-  if (state.kind === "error") {
+  const { entry, isReference, referenceAlternatives } = state;
+  const cardClass = isReference ? `${styles.card} ${styles.reference}` : styles.card;
+
+  if (entry.epoch === null) {
+    const reason = entry.detail.error ?? entry.detail.missing ?? "no timestamp";
     return (
-      <div className={styles.card}>
+      <div className={cardClass}>
         <div className={styles.header}>
-          <span className={`${styles.badge} ${styles.badgeError}`}>?</span>
+          <span className={badgeClass(entry.kind)}>{badgeLabel(entry.kind)}</span>
           <span className={styles.filename} title={file.name}>
             {file.name}
           </span>
           <span className={styles.filesize}>{formatBytes(file.size)}</span>
         </div>
-        <div className={styles.error}>{state.message}</div>
+        <div className={styles.error}>Could not read: {reason}</div>
       </div>
     );
   }
 
-  const { report } = state;
-  const selected = report.selectedSource ? report.sources[report.selectedSource] : null;
-  const otherSources = (Object.keys(report.sources) as Array<keyof typeof report.sources>).filter(
-    (k) => k !== report.selectedSource && report.sources[k].epoch !== null,
-  );
-  const cameraEntries = Object.entries(report.camera);
+  const camera = entry.mp4Report?.camera ?? {};
+  const cameraEntries = Object.entries(camera);
+  const sourceTag = entry.primarySource ? ` [${entry.primarySource}]` : "";
 
   return (
-    <div className={styles.card}>
+    <div className={cardClass}>
       <div className={styles.header}>
-        <span className={styles.badge}>MP4</span>
+        <span className={badgeClass(entry.kind)}>{badgeLabel(entry.kind)}</span>
         <span className={styles.filename} title={file.name}>
           {file.name}
         </span>
         <span className={styles.filesize}>{formatBytes(file.size)}</span>
+        {isReference && <span className={styles.refTag}>REFERENCE</span>}
       </div>
 
-      {selected ? (
+      <div className={styles.timestamp}>
+        {entry.iso}
+        <span className={styles.sourceTag}>{sourceTag}</span>
+      </div>
+
+      {isReference ? (
         <>
-          <div className={styles.timestamp}>
-            {selected.iso}
-            <span className={styles.sourceTag}>[{selected.name}]</span>
-          </div>
-          {typeof selected.detail.warning === "string" && (
-            <div className={styles.warn}>{selected.detail.warning}</div>
+          {referenceAlternatives.map((c) => (
+            <div key={c.source} className={styles.altRow}>
+              {c.iso} [{c.source}] alternative
+            </div>
+          ))}
+          {referenceAlternatives.length > 0 && (
+            <div className={styles.disagreementHint}>
+              MP4 sources disagree — pick the row whose timezone matches your other files.
+            </div>
           )}
         </>
       ) : (
-        <div className={styles.error}>No usable timestamp in mvhd or mdhd.</div>
+        <>
+          {entry.action !== null && (
+            <div className={`${styles.action} ${styles[entry.action] ?? ""}`}>
+              →{"  "}
+              {describeAction(entry.action, entry.deltaSeconds)}
+            </div>
+          )}
+          {entry.alternatives.map((alt) => (
+            <div key={alt.referenceSource} className={styles.altIndent}>
+              alt vs [{alt.referenceSource}] {alt.referenceIso}:{"  "}
+              {describeAction(alt.action, alt.deltaSeconds)}
+            </div>
+          ))}
+        </>
       )}
-
-      {otherSources.map((name) => {
-        const s = report.sources[name];
-        return (
-          <div key={name} className={styles.alt}>
-            {s.iso} [{s.name}] alternative
-          </div>
-        );
-      })}
 
       {cameraEntries.length > 0 && (
         <div className={styles.camera}>

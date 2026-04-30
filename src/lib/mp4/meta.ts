@@ -1,5 +1,4 @@
-// mvhd / mdhd / hdlr / trak collection — port of `mp4/meta.py`.
-// (Pass 1 omits stco/co64/stsz/stsc — those are only used for GPMF samples.)
+// mvhd / mdhd / hdlr / stsd / stco / co64 / stsz / stsc — port of `mp4/meta.py`.
 
 import type { RandomAccessFile } from "../randomAccessFile.ts";
 import type { Atom, FourCC } from "./atoms.ts";
@@ -79,11 +78,82 @@ export async function parseStsdFirstFormat(f: RandomAccessFile, atom: Atom): Pro
   return s;
 }
 
+export async function parseStco(f: RandomAccessFile, atom: Atom): Promise<number[]> {
+  f.seek(atom.payloadOffset + 4);
+  const head = await f.readView(4);
+  const count = head.getUint32(0, false);
+  if (count === 0) return [];
+  const view = await f.readView(count * 4);
+  const out = new Array<number>(count);
+  for (let i = 0; i < count; i++) out[i] = view.getUint32(i * 4, false);
+  return out;
+}
+
+export async function parseCo64(f: RandomAccessFile, atom: Atom): Promise<number[]> {
+  f.seek(atom.payloadOffset + 4);
+  const head = await f.readView(4);
+  const count = head.getUint32(0, false);
+  if (count === 0) return [];
+  const view = await f.readView(count * 8);
+  const out = new Array<number>(count);
+  for (let i = 0; i < count; i++) {
+    const hi = view.getUint32(i * 8, false);
+    const lo = view.getUint32(i * 8 + 4, false);
+    out[i] = hi * 0x1_0000_0000 + lo;
+  }
+  return out;
+}
+
+export interface StszResult {
+  readonly uniformSize: number; // non-zero ⇒ all samples share this size
+  readonly sizes: number[]; // populated only when uniformSize === 0
+}
+
+export async function parseStsz(f: RandomAccessFile, atom: Atom): Promise<StszResult> {
+  f.seek(atom.payloadOffset + 4);
+  const head = await f.readView(8);
+  const sampleSize = head.getUint32(0, false);
+  const sampleCount = head.getUint32(4, false);
+  if (sampleSize !== 0) return { uniformSize: sampleSize, sizes: [] };
+  if (sampleCount === 0) return { uniformSize: 0, sizes: [] };
+  const view = await f.readView(sampleCount * 4);
+  const sizes = new Array<number>(sampleCount);
+  for (let i = 0; i < sampleCount; i++) sizes[i] = view.getUint32(i * 4, false);
+  return { uniformSize: 0, sizes };
+}
+
+export interface StscEntry {
+  readonly firstChunk: number;
+  readonly samplesPerChunk: number;
+  readonly sampleDescriptionIndex: number;
+}
+
+export async function parseStsc(f: RandomAccessFile, atom: Atom): Promise<StscEntry[]> {
+  f.seek(atom.payloadOffset + 4);
+  const head = await f.readView(4);
+  const count = head.getUint32(0, false);
+  if (count === 0) return [];
+  const view = await f.readView(count * 12);
+  const out = new Array<StscEntry>(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = {
+      firstChunk: view.getUint32(i * 12, false),
+      samplesPerChunk: view.getUint32(i * 12 + 4, false),
+      sampleDescriptionIndex: view.getUint32(i * 12 + 8, false),
+    };
+  }
+  return out;
+}
+
 export interface TrackInfo {
   readonly trakAtom: Atom;
   readonly handlerType: FourCC;
   readonly sampleFormat: FourCC;
   readonly mdhd: MovieHeader | null;
+  readonly stcoAtom: Atom | null;
+  readonly co64Atom: Atom | null;
+  readonly stszAtom: Atom | null;
+  readonly stscAtom: Atom | null;
 }
 
 export async function collectTracks(f: RandomAccessFile, moov: Atom): Promise<TrackInfo[]> {
@@ -93,18 +163,49 @@ export async function collectTracks(f: RandomAccessFile, moov: Atom): Promise<Tr
     let handler = "";
     let sampleFormat = "";
     let mdhd: MovieHeader | null = null;
+    let stcoAtom: Atom | null = null;
+    let co64Atom: Atom | null = null;
+    let stszAtom: Atom | null = null;
+    let stscAtom: Atom | null = null;
 
     for await (const child of walk(f, trak.payloadOffset, trak.end)) {
-      if (child.fourcc === "hdlr") {
-        handler = await parseHdlrType(f, child);
-      } else if (child.fourcc === "mdhd") {
-        mdhd = await parseMdhd(f, child);
-      } else if (child.fourcc === "stsd") {
-        sampleFormat = await parseStsdFirstFormat(f, child);
+      switch (child.fourcc) {
+        case "hdlr":
+          handler = await parseHdlrType(f, child);
+          break;
+        case "mdhd":
+          mdhd = await parseMdhd(f, child);
+          break;
+        case "stsd":
+          sampleFormat = await parseStsdFirstFormat(f, child);
+          break;
+        case "stco":
+          stcoAtom = child;
+          break;
+        case "co64":
+          co64Atom = child;
+          break;
+        case "stsz":
+          stszAtom = child;
+          break;
+        case "stsc":
+          stscAtom = child;
+          break;
+        default:
+          break;
       }
     }
 
-    tracks.push({ trakAtom: trak, handlerType: handler, sampleFormat, mdhd });
+    tracks.push({
+      trakAtom: trak,
+      handlerType: handler,
+      sampleFormat,
+      mdhd,
+      stcoAtom,
+      co64Atom,
+      stszAtom,
+      stscAtom,
+    });
   }
   return tracks;
 }

@@ -2,87 +2,111 @@ import { useCallback, useMemo, useState } from "react";
 import styles from "./App.module.css";
 import { DropZone } from "./components/DropZone.tsx";
 import { type CardState, ResultCard } from "./components/ResultCard.tsx";
-import { type TimestampReport, extractTimestamps } from "./lib/mp4/timestamps.ts";
-import { RandomAccessFile } from "./lib/randomAccessFile.ts";
+import {
+  type FileTimestamp,
+  type SyncReport,
+  buildSyncReport,
+  describeAction,
+  readFirstTimestamp,
+} from "./lib/sync.ts";
 
-const PLACEHOLDER = "Drop GoPro MP4 / MOV files here  —  or click to browse.";
+const PLACEHOLDER = "Drop GoPro MP4 / TCX / CSV files here  —  or click to browse.";
+
+interface Slot {
+  file: File;
+  key: string;
+  stamp: FileTimestamp | null; // null while pending
+}
 
 function fileKey(f: File): string {
   return `${f.name}::${f.size}::${f.lastModified}`;
 }
 
+function truncatePath(s: string, max = 60): string {
+  if (s.length <= max) return s;
+  const keep = max - 3;
+  const head = Math.max(Math.floor(keep / 3), 6);
+  const tail = keep - head;
+  return `${s.slice(0, head)}...${s.slice(-tail)}`;
+}
+
 export default function App() {
-  const [cards, setCards] = useState<CardState[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [showRaw, setShowRaw] = useState(false);
 
-  const status = useMemo(() => {
-    if (cards.length === 0) return "Drop files to begin.";
-    const ok = cards.filter((c) => c.kind === "ok").length;
-    const errs = cards.filter((c) => c.kind === "error").length;
-    const pending = cards.filter((c) => c.kind === "pending").length;
-    const parts = [`${cards.length} file(s)`];
-    if (pending > 0) parts.push(`${pending} reading`);
-    if (errs > 0) parts.push(`${errs} failed`);
-    if (ok > 0) parts.push(`${ok} ok`);
-    return parts.join(" — ");
-  }, [cards]);
-
-  const updateCard = useCallback((key: string, update: Partial<CardState>) => {
-    setCards((prev) =>
-      prev.map((c) => (fileKey(c.file) === key ? ({ ...c, ...update } as CardState) : c)),
-    );
-  }, []);
-
-  const onFiles = useCallback(
-    (files: File[]) => {
-      const existingKeys = new Set(cards.map((c) => fileKey(c.file)));
-      const fresh = files.filter((f) => !existingKeys.has(fileKey(f)));
-      if (fresh.length === 0) return;
-
-      const newCards: CardState[] = fresh.map((file) => ({ kind: "pending", file }));
-      setCards((prev) => [...prev, ...newCards]);
-
-      for (const file of fresh) {
-        const key = fileKey(file);
-        void (async () => {
-          try {
-            const raf = new RandomAccessFile(file);
-            const report = await extractTimestamps(file.name, raf);
-            updateCard(key, { kind: "ok", file, report });
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            updateCard(key, { kind: "error", file, message });
-          }
-        })();
-      }
-    },
-    [cards, updateCard],
+  const finishedStamps = useMemo<FileTimestamp[]>(
+    () =>
+      slots
+        .filter((s): s is Slot & { stamp: FileTimestamp } => s.stamp !== null)
+        .map((s) => s.stamp),
+    [slots],
   );
 
-  const onClear = useCallback(() => setCards([]), []);
+  const report = useMemo<SyncReport>(() => buildSyncReport(finishedStamps), [finishedStamps]);
 
-  const rawText = useMemo(() => buildRawText(cards), [cards]);
+  const status = useMemo(() => {
+    if (slots.length === 0) return "Drop files to begin.";
+    const pending = slots.filter((s) => s.stamp === null).length;
+    if (pending > 0) return `Reading ${slots.length} file(s) — ${pending} pending`;
+    if (report.referenceFile === null) {
+      return `${slots.length} file(s) — no usable reference.`;
+    }
+    return `${slots.length} file(s) — reference: ${truncatePath(report.referenceFile, 50)}`;
+  }, [slots, report]);
+
+  const onFiles = useCallback((files: File[]) => {
+    setSlots((prev) => {
+      const existing = new Set(prev.map((s) => s.key));
+      const fresh = files
+        .filter((f) => !existing.has(fileKey(f)))
+        .map<Slot>((file) => ({ file, key: fileKey(file), stamp: null }));
+      if (fresh.length === 0) return prev;
+
+      for (const slot of fresh) {
+        void (async () => {
+          const stamp = await readFirstTimestamp(slot.file).catch<FileTimestamp>((err) => ({
+            file: slot.file.name,
+            kind: "unknown",
+            epoch: null,
+            iso: null,
+            primarySource: null,
+            candidates: [],
+            detail: { error: err instanceof Error ? err.message : String(err) },
+          }));
+          setSlots((cur) => cur.map((s) => (s.key === slot.key ? { ...s, stamp } : s)));
+        })();
+      }
+
+      return [...prev, ...fresh];
+    });
+  }, []);
+
+  const onClear = useCallback(() => setSlots([]), []);
+
+  const rawText = useMemo(() => buildRawText(slots, report), [slots, report]);
 
   return (
     <div className={styles.app}>
       <div className={styles.header}>
         <p className={styles.subtitle}>
-          Read first-timestamps from GoPro MP4 files. Files never leave your browser.
+          Compare first-timestamps across GoPro MP4, TCX, and RaceChrono v3 CSV files. Files never
+          leave your browser.
         </p>
       </div>
 
       <div className={styles.statusBar}>
         <span className={styles.status}>{status}</span>
-        <button type="button" onClick={onClear} disabled={cards.length === 0}>
+        <button type="button" onClick={onClear} disabled={slots.length === 0}>
           Clear
         </button>
       </div>
 
       <div className={styles.cardsArea}>
-        <DropZone onFiles={onFiles} empty={cards.length === 0} placeholder={PLACEHOLDER}>
-          {cards.map((c) => (
-            <ResultCard key={fileKey(c.file)} state={c} />
-          ))}
+        <DropZone onFiles={onFiles} empty={slots.length === 0} placeholder={PLACEHOLDER}>
+          {slots.map((slot) => {
+            const cardState: CardState = makeCardState(slot, report);
+            return <ResultCard key={slot.key} state={cardState} />;
+          })}
         </DropZone>
       </div>
 
@@ -111,36 +135,74 @@ export default function App() {
   );
 }
 
-function buildRawText(cards: readonly CardState[]): string {
-  if (cards.length === 0) return "(no output yet)";
+function makeCardState(slot: Slot, report: SyncReport): CardState {
+  if (slot.stamp === null) return { kind: "pending", file: slot.file };
+  const entry = report.entries.find((e) => e.file === slot.stamp?.file);
+  if (!entry) {
+    // Should be impossible — every finished stamp produces an entry. Fall
+    // back to a synthetic missing entry so the card still renders.
+    return {
+      kind: "ready",
+      file: slot.file,
+      entry: {
+        file: slot.file.name,
+        kind: slot.stamp.kind,
+        epoch: slot.stamp.epoch,
+        iso: slot.stamp.iso,
+        primarySource: slot.stamp.primarySource,
+        deltaSeconds: null,
+        action: null,
+        alternatives: [],
+        detail: slot.stamp.detail,
+      },
+      isReference: false,
+      referenceAlternatives: [],
+    };
+  }
+  const isReference = report.referenceFile === entry.file && entry.action === "reference";
+  return {
+    kind: "ready",
+    file: slot.file,
+    entry,
+    isReference,
+    referenceAlternatives: isReference ? report.referenceAlternatives : [],
+  };
+}
+
+function buildRawText(slots: readonly Slot[], report: SyncReport): string {
+  if (slots.length === 0) return "(no output yet)";
+  if (report.referenceFile === null) {
+    if (slots.some((s) => s.stamp === null)) return "Reading…";
+    return "No usable timestamp in any input.";
+  }
   const lines: string[] = [];
-  for (const c of cards) {
-    if (c.kind === "pending") {
-      lines.push(`${c.file.name}  -- reading…`);
+  lines.push(
+    `reference:   ${report.referenceFile} [${report.referencePrimarySource}]  ${report.referenceIso}`,
+  );
+  for (const c of report.referenceAlternatives) {
+    lines.push(`             ${c.iso} [${c.source}]  (alternative)`);
+  }
+  if (report.referenceAlternatives.length > 0) {
+    lines.push("             MP4 sources disagree — pick the matching timezone.");
+  }
+  lines.push("");
+  for (const e of report.entries) {
+    const kindCol = `[${e.kind.padEnd(3, " ")}]`;
+    if (e.epoch === null) {
+      const reason = e.detail.error ?? e.detail.missing ?? "no timestamp";
+      lines.push(`${e.file}  ${kindCol}  -- ${reason}`);
       continue;
     }
-    if (c.kind === "error") {
-      lines.push(`${c.file.name}  -- error: ${c.message}`);
+    if (e.action === "reference") {
+      lines.push(`${e.file}  ${kindCol}  ${e.iso}  (reference)`);
       continue;
     }
-    const r: TimestampReport = c.report;
-    const sel = r.selectedSource ? r.sources[r.selectedSource] : null;
-    if (!sel || sel.iso === null) {
-      lines.push(`${c.file.name}  -- no usable timestamp`);
-      continue;
+    lines.push(`${e.file}  ${kindCol}  ${e.iso}  ${describeAction(e.action, e.deltaSeconds)}`);
+    for (const alt of e.alternatives) {
+      lines.push(
+        `        alt vs [${alt.referenceSource}] ${alt.referenceIso}:  ${describeAction(alt.action, alt.deltaSeconds)}`,
+      );
     }
-    lines.push(`${c.file.name}  ${sel.iso}  [${sel.name}]`);
-    for (const k of Object.keys(r.sources) as Array<keyof typeof r.sources>) {
-      if (k === r.selectedSource) continue;
-      const alt = r.sources[k];
-      if (alt.iso !== null) {
-        lines.push(`    alt: ${alt.iso}  [${alt.name}]`);
-      }
-    }
-    const cam = Object.entries(r.camera)
-      .map(([key, val]) => `${key}=${val}`)
-      .join("  ");
-    if (cam) lines.push(`    camera: ${cam}`);
   }
   return lines.join("\n");
 }
