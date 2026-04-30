@@ -1,12 +1,18 @@
 # gpmf-sync-web
 
 Browser-side GoPro MP4 timestamp extractor — a TypeScript port of
-[`gpmf-sync`](https://github.com/albertowd/gpmf-sync) that runs entirely
-in the browser. Files never leave your machine.
+[`albertowd/gpmf-sync`](https://github.com/albertowd/gpmf-sync) that
+runs entirely in the browser. Files never leave your machine.
 
 The streaming MP4 atom parser only reads the bytes it needs (a few KB of
 the `moov` box, plus camera metadata in `udta`), so a 10 GB GoPro `.MP4`
 is handled without uploading or buffering it.
+
+> **Prefer a CLI / GUI install?** The original Python project at
+> [`albertowd/gpmf-sync`](https://github.com/albertowd/gpmf-sync) ships a
+> `gmpf-sync` CLI plus a tkinter drag-and-drop GUI, with the same
+> mvhd/mdhd/gps/cdat sources and TCX + RaceChrono v3 CSV alignment.
+> This web port mirrors its parser and `sync` report layer module-for-module.
 
 ## Status
 
