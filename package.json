@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@vercel/analytics": "^2",
     "lucide-react": "^1",
     "react": "^19",
     "react-dom": "^19"
@@ -12,7 +13,7 @@
     "@vitejs/plugin-react": "^6",
     "png-to-ico": "^3",
     "sharp": "^0",
-    "typescript": "^6",
+    "typescript": "^7",
     "vite": "^8"
   },
   "license": "AGPL-3.0-or-later",

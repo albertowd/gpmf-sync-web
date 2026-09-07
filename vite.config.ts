@@ -35,9 +35,16 @@ function inlineCss(): Plugin {
   };
 }
 
+// Vercel sets VERCEL=1 for every build running on its infrastructure, which
+// is the only place the Web Analytics script (/_vercel/insights/) is served.
+const IS_VERCEL_BUILD = process.env.VERCEL === "1";
+
 export default defineConfig({
   plugins: [react(), inlineCss()],
   base: "./",
+  define: {
+    __VERCEL_BUILD__: JSON.stringify(IS_VERCEL_BUILD),
+  },
   build: {
     target: "es2022",
     sourcemap: true,
